@@ -16,8 +16,12 @@ st.title('自然言語処理')
 modelDirPath = './model' #モデル関連ディレクトリ
 modelFilePath =  './model/pytorch_model.bin' #モデル本体
 
-st.write('入力された記事を解析して、「MOVIE ENTER」「ITライフハック」「家電チャンネル」「トピックニュース」「livedoor HOMME」「Peachy」「Sports Watch」「独女通信」「エスマックス」に分類します。')    
-article = st.text_area('記事を入力し、Ctrl+Enterで解析結果を表示します。')
+st.write('・入力された記事を解析して、「MOVIE ENTER」「ITライフハック」「家電チャンネル」「トピックニュース」「livedoor HOMME」「Peachy」「Sports Watch」「独女通信」「エスマックス」に分類します。')    
+st.write('・解析するモデルを選んで下さい。')
+isBert = st.checkbox('BERT解析')
+isLstm = st.checkbox('LSTM解析')
+isRandamforest = st.checkbox('Randamforest解析')
+article = st.text_area('・記事を入力し、Ctrl+Enterで解析結果を表示します。')
 
 if os.path.isdir(modelDirPath) and os.path.isfile(modelFilePath) and article:
     #モデルが配置されており、かつ入力がある場合
@@ -77,9 +81,18 @@ if os.path.isdir(modelDirPath) and os.path.isfile(modelFilePath) and article:
     plt.xlabel("category")
     plt.ylabel("probability")
     width = 0.3
-    plt.bar(x, predict[0], color='r', width=width, label='BERT', align='center')
-    plt.bar(x+width, predict[0], color='b', width=width, label='LSTM', align='center')
-    plt.bar(x+width+width, predict[0], color='y', width=width, label='RandomForest', align='center')
-    plt.xticks(x + width/3, category_list, rotation=45)
+
+    #チェックされたモデル数によって描画調整
+    checked = int(isBert) + int(isLstm) + int(isRandamforest)
+
+    if isBert == True :
+        plt.bar(x, predict[0], color='r', width=width, label='BERT', align='center')
+    if isLstm == True :
+        plt.bar(x+width, predict[0], color='b', width=width, label='LSTM', align='center')
+    if isRandamforest == True :
+        plt.bar(x+width+width, predict[0], color='y', width=width, label='RandomForest', align='center')
+    
+    #x軸ラベル位置を調整
+    plt.xticks(x + width, category_list, rotation=45)
     plt.legend(loc='best')
     st.pyplot(fig)
