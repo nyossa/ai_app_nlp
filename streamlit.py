@@ -7,6 +7,7 @@ import os
 import matplotlib.pyplot as plt 
 import torch #BERT動かすにはtorchライブラリが必要。
 from transformers import BertForSequenceClassification, BertJapaneseTokenizer
+from torch import nn #ソフトマックス関数使用。
 
 #タイトルの表示
 st.title('自然言語処理')
@@ -59,26 +60,26 @@ if os.path.isdir(modelDirPath) and os.path.isfile(modelFilePath) and article:
     words = loaded_tokenizer.tokenize(article)
     word_ids = loaded_tokenizer.convert_tokens_to_ids(words)  # 単語をインデックスに変換
     word_tensor = torch.tensor([word_ids[:max_length]])  # テンソルに変換
-    pred = loaded_model(word_tensor)
-    pred = pred[0].detach().numpy() #numpyに変換→detach()関数でデータ部分を切り離し、numpy()でnumpyに変換する。
-    # st.write(pred[0])
-    # st.write(pred[0].detach().numpy())
-    st.write('解析結果：')
-    st.write('BERT')
-    st.table(pred )
-    pred = np.round(pred, decimals=2) * 100
-    # pred3 = np.round(pred, decimals=2) #四捨五入
+    out = loaded_model(word_tensor)
 
-    #描画
+    #出力結果が確率ではないためソフトマックスに通して確率にする。
+    F = nn.Softmax(dim=1)
+    out_F = F(out[0])
+
+    #Tensor型からnumpyに変換→detach()関数でデータ部分を切り離し、numpy()でnumpyに変換する。
+    predict = out_F.detach().numpy() 
+
+    #結果の描画
+    st.write('解析結果：')
     fig, ax = plt.subplots()
-    x = np.arange(len(pred[0])) 
+    x = np.arange(len(predict[0])) 
     plt.title("Analysis result")
     plt.xlabel("category")
     plt.ylabel("probability")
     width = 0.3
-    plt.bar(x, pred[0], color='r', width=width, label='BERT', align='center')
-    plt.bar(x+width, pred[0], color='b', width=width, label='LSTM', align='center')
-    plt.bar(x+width+width, pred[0], color='y', width=width, label='RandomForest', align='center')
+    plt.bar(x, predict[0], color='r', width=width, label='BERT', align='center')
+    plt.bar(x+width, predict[0], color='b', width=width, label='LSTM', align='center')
+    plt.bar(x+width+width, predict[0], color='y', width=width, label='RandomForest', align='center')
     plt.xticks(x + width/3, category_list, rotation=45)
     plt.legend(loc='best')
     st.pyplot(fig)
