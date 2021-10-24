@@ -9,9 +9,6 @@ import torch #BERT動かすにはtorchライブラリが必要。
 from transformers import BertForSequenceClassification, BertJapaneseTokenizer
 from torch import nn #ソフトマックス関数使用。
 import pickle
-from model import LSTM_Corona 
-#↑あるクラスのインスタンスをpickle 化したとき、pickle を読み込んで利用するときにはクラスを別途import する必要がある。
-#https://gist.github.com/masaki925/234c4d88228f987bee47bd47e2749fcb
 from sklearn.preprocessing import MinMaxScaler
 
 # #モデルの存在確認
@@ -19,14 +16,22 @@ MODEL_DIR_PATH = './model/bert' #モデル関連ディレクトリ
 MODEL_FILE_PATH =  './model/bert/pytorch_model.bin' #モデル本体
 CATEGORY_PATH = "./model/text"  # フォルダの場所を指定
 
-covid19_data = './time_series_covid19_confirmed_global.csv'#COVID19データ
-df = pd.read_csv(covid19_data)
-df = df.iloc[:,37:]
-daily_global = df.sum(axis=0)
-daily_global.index = pd.to_datetime(daily_global.index)
-y=daily_global.values.astype(float)
-
 window_size = 30
+
+#COVID19データ取り込み
+covid19_data = './time_series_covid19_confirmed_global.csv'
+df = pd.read_csv(covid19_data)
+
+#データの中で0で変化がないところを削る。
+df = df.iloc[:,37:]
+
+#日ベースごとに全世界を足して、各日ベースの世界全体の感染者数求める
+daily_global = df.sum(axis=0)
+
+#日付の値をpandasのdatetimeに変換
+daily_global.index = pd.to_datetime(daily_global.index)
+
+y = daily_global.values.astype(float)
 
 def main():
     #タイトルの表示
