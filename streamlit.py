@@ -1,8 +1,6 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-from PIL import Image #PIL（ピル）は画像表示用
-##下記今回追加
 import os
 import matplotlib.pyplot as plt 
 import torch #BERT動かすにはtorchライブラリが必要。
@@ -12,6 +10,7 @@ import pickle
 from sklearn.preprocessing import MinMaxScaler
 import japanize_matplotlib #matplotlibのラベルの文字化け解消のためインストール
 import datetime
+import matplotlib.ticker as mtick #グラフ描画時にy軸に%表示する。
 #from model import LSTM_Corona
 
 # #モデルの存在確認
@@ -82,45 +81,17 @@ def main():
             st.pyplot(fig)
 
     else:
-        #st.write('・入力された記事を、「独女通信」「livedoor HOMME」「家電チャンネル」「エスマックス」「トピックニュース」「Peachy」「MOVIE ENTER」「ITライフハック」「Sports Watch」に分類します。')    
-        # st.write('・解析モデルを選んで下さい。')
-        # sel_bert = st.checkbox('BERT解析')
-        # sel_lstm = st.checkbox('LSTM解析')
-        # sel_random_forest = st.checkbox('Randamforest解析')
         text = st.text_area('・カテゴリー分類する記事を入力して下さい。')
 
         #解析ボタン
         start = st.button('解析開始')
 
-        #選択された解析モデルの数
-        # num_sel = int(sel_bert) + int(sel_lstm) + int(sel_random_forest)
-
-        #チェック
-        # if start and num_sel == 0:
-        #     st.write('<span style="color:red;">解析モデルを選択して下さい。</span>', unsafe_allow_html=True)
         if start and not text:
             st.write('<span style="color:red;">解析する記事を入力して下さい。</span>', unsafe_allow_html=True)
 
-        # if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and num_sel != 0 and start:
         if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and start:
-            #モデルが配置されており、かつ入力がある場合
 
-            # #モデル読み込み
-            # loaded_model = BertForSequenceClassification.from_pretrained(MODEL_DIR_PATH)
-            # # loaded_tokenizer = BertJapaneseTokenizer.from_pretrained('cl-tohoku/bert-base-japanese-whole-word-masking')
-            # loaded_tokenizer = BertJapaneseTokenizer.from_pretrained(MODEL_DIR_PATH)
-
-            category_list = []
-            # dir_files = os.listdir(path=CATEGORY_PATH)
-
-            # for f in os.listdir(CATEGORY_PATH):
-            #     # st.write(os.path.join(CATEGORY_PATH, f))
-            #     if os.path.isdir(os.path.join(CATEGORY_PATH, f)):
-            #         category_list.append(f)
-
-            #dirs = [f for f in dir_files if os.path.isdir(os.path.join(sample_path, f))]  # ディレクトリ一覧
-            #st.write(category_list)
-
+            #カテゴリー辞書
             category_dict = {'dokujo-tsushin':'独女通信',
                             'livedoor-homme':'livedoor HOMME',
                             'kaden-channel':'家電チャンネル',
@@ -131,16 +102,18 @@ def main():
                             'it-life-hack':'ITライフハック',
                             'sports-watch':'Sports Watch'}
 
-            category_key_list = list(category_dict.keys())#カテゴリー辞書のキーリスト
-            category_values_list = list(category_dict.values())#カテゴリー辞書の値リスト
+            #カテゴリー辞書のキーリスト
+            category_key_list = list(category_dict.keys())
+            #カテゴリー辞書の値リスト
+            category_values_list = list(category_dict.values())
 
             #改行\n、タブ\t、復帰\r、全角スペース\u3000を除去
             text = [sentence.strip() for sentence in text]
             text = list(filter(lambda line: line != '', text))
             text = ''.join(text)
-            text = text.translate(str.maketrans(
-                {"\n":"", "\t":"", "\r":"", "\u3000":""})) 
+            text = text.translate(str.maketrans({"\n":"", "\t":"", "\r":"", "\u3000":""})) 
 
+            #解析実行
             out = analyze_bert(text)
 
             #出力結果が確率ではないためソフトマックスに通して確率にする。
@@ -150,26 +123,18 @@ def main():
             #Tensor型からnumpyに変換→detach()関数でデータ部分を切り離し、numpy()でnumpyに変換する。
             predict = out_F.detach().numpy() 
 
-            #結果の描画
+            #解析結果の描画
             fig, ax = plt.subplots()
             x = np.arange(len(predict[0])) 
+            y = np.round(predict[0]*100).astype(int)#結果を%表示するので四捨五入しint型に変換。
+
             plt.title("解析結果")
             plt.xlabel("カテゴリー", fontsize=13)
             plt.ylabel("確率", fontsize=13)
-            # width = 0.3
             plt.grid(linestyle='dotted', linewidth=1)
-            plt.bar(x, predict[0],  label='カテゴリー', align='center', alpha=0.7)
-            # if sel_bert == True :
-            #     plt.bar(x, predict[0], color='r', width=width, label='BERT', align='center')
-            # if sel_lstm == True :
-            #     plt.bar(x+width, predict[0], color='b', width=width, label='LSTM', align='center')
-            # if sel_random_forest == True :
-            #     plt.bar(x+width+width, predict[0], color='y', width=width, label='RandomForest', align='center')
-
-            #x軸ラベル位置を調整
-            # plt.xticks(x + width, category_list, rotation=45)
+            plt.bar(x, y,  label='カテゴリー', align='center', alpha=0.7)
             plt.xticks(x, category_values_list, fontsize=8, rotation=45)
-            # plt.legend(loc='best')
+            ax.yaxis.set_major_formatter(mtick.PercentFormatter())#y軸を%表示
             st.pyplot(fig)
 
 #LSTM解析
