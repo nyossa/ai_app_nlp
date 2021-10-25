@@ -10,11 +10,19 @@ from transformers import BertForSequenceClassification, BertJapaneseTokenizer
 from torch import nn #ソフトマックス関数使用。
 import pickle
 from sklearn.preprocessing import MinMaxScaler
+import japanize_matplotlib #matplotlibのラベルの文字化け解消のためインストール
+import datetime
+#from model import LSTM_Corona
 
 # #モデルの存在確認
 MODEL_DIR_PATH = './model/bert' #モデル関連ディレクトリ
 MODEL_FILE_PATH =  './model/bert/pytorch_model.bin' #モデル本体
 CATEGORY_PATH = "./model/text"  # フォルダの場所を指定
+
+#基準年月日
+base_y = 2021
+base_m = 10
+base_d = 24
 
 window_size = 30
 
@@ -37,45 +45,64 @@ def main():
     #タイトルの表示
     st.title('時系列処理')
 
-    selected_item = st.selectbox('時系列処理を選択して下さい。',
-                                 ['Covid19予測', '文章分類'])
+    selected_item = st.selectbox('・時系列処理を選択して下さい。',
+                                 ['Covid19予測（LSTM）', '文章分類（BERT）'])
 
-    if selected_item == 'Covid19予測':
-        st.write('・Covid19予測を行います。')
+    if selected_item == 'Covid19予測（LSTM）':
+        selected_item = st.selectbox('・何日後まで予測するか選択して下さい。',
+                                 ['', '10日後', '20日後', '30日後', '60日後'])
+        #予測ボタン
+        start = st.button('予測開始')
 
-        out = analyze_lstm(10)
+        if start and not selected_item:
+            st.write('<span style="color:red;">予測する期間を選択して下さい。</span>', unsafe_allow_html=True)
 
-        #講座では2020年データ使用しており3日間しか予測しないので、グラフ化した時に見にくいので、１ヶ月分を予測するようにする。
-        x = np.arange('2021-10-25','2021-11-04', dtype='datetime64[D]').astype('datetime64[D]')
+        if start and selected_item:
+            date_dict = {'10日後':10, '20日後':20, '30日後':30, '60日後':60}
+            sel_datte = date_dict[selected_item]
 
-        fig, ax = plt.subplots(figsize=(12,5))
-        plt.title('The number of person affected by Corona virus globally')
-        plt.grid(True)
-        plt.plot(daily_global)#オリジナルデータ
-        plt.plot(x, out[window_size:])#予測値
-        st.pyplot(fig)
+            d = datetime.date(base_y, base_m, base_d)
+            target_d = d + datetime.timedelta(days=sel_datte)
+            base_date = str(base_y) + '-' + str(base_m) + '-' + str(base_d) #基準日
+
+            out = analyze_lstm(sel_datte)
+
+            #講座では2020年データ使用しており3日間しか予測しないので、グラフ化した時に見にくいので、１ヶ月分を予測するようにする。
+            x = np.arange(base_date,target_d, dtype='datetime64[D]').astype('datetime64[D]')
+
+            fig, ax = plt.subplots(figsize=(12,5))
+            plt.title('コロナウィルスの全世界感染者数')
+            plt.ylabel("感染者数")
+            plt.xlabel("日付")
+            plt.grid(linestyle='dotted', linewidth=1)
+            plt.gca().ticklabel_format(style='plain', axis='y')#y軸を省略せずにメモリ表示
+            plt.plot(daily_global, label='確定値')#オリジナルデータ
+            plt.plot(x, out[window_size:],label='予測結果')#予測値
+            plt.legend(loc='best')
+            st.pyplot(fig)
 
     else:
-        st.write('・入力された記事を解析して、「MOVIE ENTER」「ITライフハック」「家電チャンネル」「トピックニュース」「livedoor HOMME」「Peachy」「Sports Watch」「独女通信」「エスマックス」に分類します。')    
-        st.write('・解析モデルを選んで下さい。')
-        sel_bert = st.checkbox('BERT解析')
-        sel_lstm = st.checkbox('LSTM解析')
-        sel_random_forest = st.checkbox('Randamforest解析')
-        text = st.text_area('・解析する記事を入力して下さい。')
+        #st.write('・入力された記事を、「独女通信」「livedoor HOMME」「家電チャンネル」「エスマックス」「トピックニュース」「Peachy」「MOVIE ENTER」「ITライフハック」「Sports Watch」に分類します。')    
+        # st.write('・解析モデルを選んで下さい。')
+        # sel_bert = st.checkbox('BERT解析')
+        # sel_lstm = st.checkbox('LSTM解析')
+        # sel_random_forest = st.checkbox('Randamforest解析')
+        text = st.text_area('・カテゴリー分類する記事を入力して下さい。')
 
         #解析ボタン
-        start = st.button('解析')
+        start = st.button('解析開始')
 
         #選択された解析モデルの数
-        num_sel = int(sel_bert) + int(sel_lstm) + int(sel_random_forest)
+        # num_sel = int(sel_bert) + int(sel_lstm) + int(sel_random_forest)
 
         #チェック
-        if start and num_sel == 0:
-            st.write('<span style="color:red;">解析モデルを選択して下さい。</span>', unsafe_allow_html=True)
+        # if start and num_sel == 0:
+        #     st.write('<span style="color:red;">解析モデルを選択して下さい。</span>', unsafe_allow_html=True)
         if start and not text:
             st.write('<span style="color:red;">解析する記事を入力して下さい。</span>', unsafe_allow_html=True)
 
-        if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and num_sel != 0 and start:
+        # if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and num_sel != 0 and start:
+        if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and start:
             #モデルが配置されており、かつ入力がある場合
 
             # #モデル読み込み
@@ -84,25 +111,28 @@ def main():
             # loaded_tokenizer = BertJapaneseTokenizer.from_pretrained(MODEL_DIR_PATH)
 
             category_list = []
-            dir_files = os.listdir(path=CATEGORY_PATH)
+            # dir_files = os.listdir(path=CATEGORY_PATH)
 
-            for f in os.listdir(CATEGORY_PATH):
-                # st.write(os.path.join(CATEGORY_PATH, f))
-                if os.path.isdir(os.path.join(CATEGORY_PATH, f)):
-                    category_list.append(f)
+            # for f in os.listdir(CATEGORY_PATH):
+            #     # st.write(os.path.join(CATEGORY_PATH, f))
+            #     if os.path.isdir(os.path.join(CATEGORY_PATH, f)):
+            #         category_list.append(f)
 
             #dirs = [f for f in dir_files if os.path.isdir(os.path.join(sample_path, f))]  # ディレクトリ一覧
             #st.write(category_list)
 
-            # category_list = ['movie-enter', #MOVIE ENTER
-            #                 'it-life-hack', #ITライフハック
-            #                 'kaden-channel', #家電チャンネル
-            #                 'topic-news',    #トピックニュース
-            #                 'livedoor-homme', #livedoor HOMME
-            #                 'peachy', # Peachy
-            #                 'sports-watch', #Sports Watch
-            #                 'dokujo-tsushin', #独女通信
-            #                 'smax'] #エスマックス
+            category_dict = {'dokujo-tsushin':'独女通信',
+                            'livedoor-homme':'livedoor HOMME',
+                            'kaden-channel':'家電チャンネル',
+                            'smax':'エスマックス',
+                            'topic-news':'トピックニュース',
+                            'peachy':'Peachy',
+                            'movie-enter':'MOVIE ENTER',
+                            'it-life-hack':'ITライフハック',
+                            'sports-watch':'Sports Watch'}
+
+            category_key_list = list(category_dict.keys())#カテゴリー辞書のキーリスト
+            category_values_list = list(category_dict.values())#カテゴリー辞書の値リスト
 
             #改行\n、タブ\t、復帰\r、全角スペース\u3000を除去
             text = [sentence.strip() for sentence in text]
@@ -111,11 +141,6 @@ def main():
             text = text.translate(str.maketrans(
                 {"\n":"", "\t":"", "\r":"", "\u3000":""})) 
 
-            # max_length = 512
-            # words = loaded_tokenizer.tokenize(text)
-            # word_ids = loaded_tokenizer.convert_tokens_to_ids(words)  # 単語をインデックスに変換
-            # word_tensor = torch.tensor([word_ids[:max_length]])  # テンソルに変換
-            # out = loaded_model(word_tensor)
             out = analyze_bert(text)
 
             #出力結果が確率ではないためソフトマックスに通して確率にする。
@@ -126,24 +151,25 @@ def main():
             predict = out_F.detach().numpy() 
 
             #結果の描画
-            st.write('解析結果：')
             fig, ax = plt.subplots()
             x = np.arange(len(predict[0])) 
-            plt.title("Analysis result")
-            plt.xlabel("category")
-            plt.ylabel("probability")
-            width = 0.3
-
-            if sel_bert == True :
-                plt.bar(x, predict[0], color='r', width=width, label='BERT', align='center')
-            if sel_lstm == True :
-                plt.bar(x+width, predict[0], color='b', width=width, label='LSTM', align='center')
-            if sel_random_forest == True :
-                plt.bar(x+width+width, predict[0], color='y', width=width, label='RandomForest', align='center')
+            plt.title("解析結果")
+            plt.xlabel("カテゴリー", fontsize=13)
+            plt.ylabel("確率", fontsize=13)
+            # width = 0.3
+            plt.grid(linestyle='dotted', linewidth=1)
+            plt.bar(x, predict[0],  label='カテゴリー', align='center', alpha=0.7)
+            # if sel_bert == True :
+            #     plt.bar(x, predict[0], color='r', width=width, label='BERT', align='center')
+            # if sel_lstm == True :
+            #     plt.bar(x+width, predict[0], color='b', width=width, label='LSTM', align='center')
+            # if sel_random_forest == True :
+            #     plt.bar(x+width+width, predict[0], color='y', width=width, label='RandomForest', align='center')
 
             #x軸ラベル位置を調整
-            plt.xticks(x + width, category_list, rotation=45)
-            plt.legend(loc='best')
+            # plt.xticks(x + width, category_list, rotation=45)
+            plt.xticks(x, category_values_list, fontsize=8, rotation=45)
+            # plt.legend(loc='best')
             st.pyplot(fig)
 
 #LSTM解析
@@ -185,7 +211,7 @@ def analyze_bert(text):
      word_ids = loaded_tokenizer.convert_tokens_to_ids(words)  # 単語をインデックスに変換
      word_tensor = torch.tensor([word_ids[:max_length]])  # テンソルに変換
      out = loaded_model(word_tensor)
- 
+    
      return out
 
 if __name__ == "__main__":
