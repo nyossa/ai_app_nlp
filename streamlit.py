@@ -13,6 +13,7 @@ import datetime
 import matplotlib.ticker as mtick #グラフ描画時にy軸に%表示する。
 from model import LSTM_Corona
 
+
 # #モデルの存在確認
 MODEL_DIR_PATH = './model/bert' #モデル関連ディレクトリ
 MODEL_FILE_PATH =  './model/bert/pytorch_model.bin' #モデル本体
