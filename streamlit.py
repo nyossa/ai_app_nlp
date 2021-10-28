@@ -11,7 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 import japanize_matplotlib #matplotlibのラベルの文字化け解消のためインストール
 import datetime
 import matplotlib.ticker as mtick #グラフ描画時にy軸に%表示する。
-#from model import LSTM_Corona
+from model import LSTM_Corona
 
 # #モデルの存在確認
 MODEL_DIR_PATH = './model/bert' #モデル関連ディレクトリ
@@ -45,8 +45,8 @@ def main():
     st.title('時系列処理')
 
     selected_item = st.selectbox('・時系列処理を選択して下さい。',
-                                 ['Covid19予測（LSTM）', '文章分類（BERT）'])
-
+                                 ['', 'Covid19予測（LSTM）', '文章分類（BERT）'])
+    
     if selected_item == 'Covid19予測（LSTM）':
         selected_item = st.selectbox('・何日後まで予測するか選択して下さい。',
                                  ['', '10日後', '20日後', '30日後', '60日後'])
@@ -80,17 +80,25 @@ def main():
             plt.legend(loc='best')
             st.pyplot(fig)
 
-    else:
+    elif selected_item == '文章分類（BERT）':
         text = st.text_area('・カテゴリー分類する記事を入力して下さい。')
+        
+        st.session_state.start = False
 
         #解析ボタン
         start = st.button('解析開始')
+        
+        if start:
+            st.session_state.start = True
 
-        if start and not text:
+        #if start and not text:
+        if st.session_state.start and not text:
             st.write('<span style="color:red;">解析する記事を入力して下さい。</span>', unsafe_allow_html=True)
-
-        if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and start:
-
+       
+        #if os.path.isdir(MODEL_DIR_PATH) and os.path.isfile(MODEL_FILE_PATH) and text and start:
+        #if start and text:
+        if st.session_state.start and text:
+            
             #カテゴリー辞書
             category_dict = {'dokujo-tsushin':'独女通信',
                             'livedoor-homme':'livedoor HOMME',
@@ -101,7 +109,7 @@ def main():
                             'movie-enter':'MOVIE ENTER',
                             'it-life-hack':'ITライフハック',
                             'sports-watch':'Sports Watch'}
-
+            
             #カテゴリー辞書のキーリスト
             category_key_list = list(category_dict.keys())
             #カテゴリー辞書の値リスト
@@ -112,10 +120,8 @@ def main():
             text = list(filter(lambda line: line != '', text))
             text = ''.join(text)
             text = text.translate(str.maketrans({"\n":"", "\t":"", "\r":"", "\u3000":""})) 
-
             #解析実行
             out = analyze_bert(text)
-
             #出力結果が確率ではないためソフトマックスに通して確率にする。
             F = nn.Softmax(dim=1)
             out_F = F(out[0])
@@ -168,9 +174,11 @@ def analyze_lstm(future=10):
 def analyze_bert(text):
 
      #モデル読み込み
-     loaded_model = BertForSequenceClassification.from_pretrained(MODEL_DIR_PATH)
-     loaded_tokenizer = BertJapaneseTokenizer.from_pretrained(MODEL_DIR_PATH)
+     #loaded_model = BertForSequenceClassification.from_pretrained(MODEL_DIR_PATH)
+     #loaded_tokenizer = BertJapaneseTokenizer.from_pretrained(MODEL_DIR_PATH)
 
+     loaded_model = load_bert_model()
+     loaded_tokenizer = load_bert_tokenizer()
      max_length = 512
      words = loaded_tokenizer.tokenize(text)
      word_ids = loaded_tokenizer.convert_tokens_to_ids(words)  # 単語をインデックスに変換
@@ -178,6 +186,16 @@ def analyze_bert(text):
      out = loaded_model(word_tensor)
     
      return out
+
+@st.cache(allow_output_mutation=True)
+def load_bert_model():
+    model = BertForSequenceClassification.from_pretrained(MODEL_DIR_PATH)
+    return model
+
+@st.cache(allow_output_mutation=True)
+def load_bert_tokenizer():
+    tokenizer = BertJapaneseTokenizer.from_pretrained(MODEL_DIR_PATH)
+    return tokenizer
 
 if __name__ == "__main__":
     main()
